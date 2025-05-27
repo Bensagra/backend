@@ -1,9 +1,8 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-const mongoose = require("mongoose");
 
-const Admin = mongoose.model("Admin");
+const Admin = require("../models/Admin");
 
 require("dotenv").config({ path: ".variables.env" });
 
