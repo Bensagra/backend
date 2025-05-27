@@ -1,10 +1,10 @@
 const crudMethods = require("./crudMethods");
 const mongoose = require("mongoose");
-require("../../models/Admin");
-require("../../models/Client");
-require("../models/Product");
-require("../../models/Lead");
-require("../../models/ProcessCSV");
+require("../../models/Admin.js");
+require("../../models/Client.js");
+require("../models/Product.js");
+require("../../models/Lead.js");
+require("../../models/ProcessCSV.js");
 
 exports.crudController = (modelName) => {
   const Model = mongoose.model(modelName);
