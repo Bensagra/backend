@@ -1,4 +1,5 @@
-const Admin = require("../models/Admin");
+const mongoose = require("mongoose");
+const Admin = mongoose.model("Admin");
 
 /**
  *  Get all documents of a Model

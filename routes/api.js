@@ -1,10 +1,5 @@
 const express = require("express");
 const multer = require('multer');
-require("./../models/Admin.js");
-require("./../models/Client.js");
-require("./../models/Product.js");
-require("./../models/Lead.js");
-require("./../models/ProcessCSV.js");
 
 const { catchErrors } = require("../handlers/errorHandlers");
 

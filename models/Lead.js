@@ -1,9 +1,7 @@
 const mongoose = require("mongoose");
-const { Schema } = mongoose;
-
 mongoose.Promise = global.Promise;
 
-const leadSchema = new Schema({
+const leadSchema = new mongoose.Schema({
   date: {
     type: String,
     required: true,
@@ -22,6 +20,7 @@ const leadSchema = new Schema({
     trim: true,
     required: true,
   },
+
   budget: {
     type: Number,
   },

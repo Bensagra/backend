@@ -1,7 +1,9 @@
 const mongoose = require("mongoose");
+const Schema = mongoose.Schema;
+mongoose.Promise = global.Promise;
 const bcrypt = require("bcryptjs");
 
-const adminSchema = new mongoose.Schema({
+const adminSchema = new Schema({
   removed: {
     type: Boolean,
     default: false,
@@ -21,14 +23,8 @@ const adminSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  name: {
-    type: String,
-    required: true,
-  },
-  surname: {
-    type: String,
-    required: true,
-  },
+  name: { type: String, required: true },
+  surname: { type: String, required: true },
   photo: {
     type: String,
     trim: true,
@@ -43,17 +39,17 @@ const adminSchema = new mongoose.Schema({
   isRootUser: {
     type: Boolean,
     default: false,
-  },
+  }
 });
 
-// Métodos
+// generating a hash
 adminSchema.methods.generateHash = function (password) {
   return bcrypt.hashSync(password, bcrypt.genSaltSync(), null);
 };
 
+// checking if password is valid
 adminSchema.methods.validPassword = function (password) {
   return bcrypt.compareSync(password, this.password);
 };
 
-// Exportá el modelo
 module.exports = mongoose.model("Admin", adminSchema);
