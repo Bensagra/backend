@@ -37,7 +37,6 @@ app.use(
 );
 
 const fs = require("fs");
-const path = require("path");
 
 const modelsPath = path.join(__dirname, "models");
 
