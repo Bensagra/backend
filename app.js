@@ -11,7 +11,11 @@ const authApiRouter = require("./routes/authApi");
 const errorHandlers = require("./handlers/errorHandlers");
 
 const { isValidToken } = require("./controllers/authController");
-
+require("./models/Admin");
+require("./models/Client");
+require("./models/Product");
+require("./models/Lead");
+require("./models/ProcessCSV");
 require("dotenv").config({ path: ".variables.env" });
 
 // create our Express app

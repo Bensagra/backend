@@ -1,5 +1,10 @@
 const express = require("express");
 const multer = require('multer');
+require("../../models/Admin");
+require("../../models/Client");
+require("../../models/Product");
+require("../../models/Lead");
+require("../../models/ProcessCSV");
 
 const { catchErrors } = require("../handlers/errorHandlers");
 
