@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const Admin = require("../models/Admin")
 const Admin = mongoose.model("Admin");
 
 /**

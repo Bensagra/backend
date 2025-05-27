@@ -36,6 +36,17 @@ app.use(
   })
 );
 
+const fs = require("fs");
+const path = require("path");
+
+const modelsPath = path.join(__dirname, "models");
+
+fs.readdirSync(modelsPath).forEach(function (file) {
+  if (file.endsWith(".js")) {
+    require(path.join(modelsPath, file));
+  }
+});
+
 // pass variables to our templates + all requests
 app.use((req, res, next) => {
   res.locals.admin = req.admin || null;
