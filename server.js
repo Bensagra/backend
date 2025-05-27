@@ -25,9 +25,17 @@ mongoose.Promise = global.Promise; // Tell Mongoose to use ES6 promises
 mongoose.connection.on("error", (err) => {
   console.error(`🚫 Error → : ${err.message}`);
 });
+const fs = require("fs");
 
+const modelsPath = path.join(__dirname, "models");
+
+fs.readdirSync(modelsPath).forEach((file) => {
+  if (file.endsWith(".js")) {
+    require(path.join(modelsPath, file));
+  }
+});
 const glob = require("glob");
-const path = require("path");
+
 
 glob.sync("./models/*.js").forEach(function (file) {
   require(path.resolve(file));
