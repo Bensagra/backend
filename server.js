@@ -26,6 +26,7 @@ mongoose.connection.on("error", (err) => {
   console.error(`🚫 Error → : ${err.message}`);
 });
 const fs = require("fs");
+const path = require("path");
 
 const modelsPath = path.join(__dirname, "models");
 
