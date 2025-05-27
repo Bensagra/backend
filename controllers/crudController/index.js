@@ -1,5 +1,10 @@
 const crudMethods = require("./crudMethods");
 const mongoose = require("mongoose");
+require("../models/Admin");
+require("../models/Client");
+require("../models/Product");
+require("../models/Lead");
+require("../models/ProcessCSV");
 
 exports.crudController = (modelName) => {
   const Model = mongoose.model(modelName);
