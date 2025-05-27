@@ -60,7 +60,7 @@ router.route("/product/upload").get(catchErrors(productController.list));
 
 
 //_____________________________________ API for upload file ___________________________
-router.route("/uploadfile").post(upload.single('file'), catchErrors(fileController.fileApi.uploadFile));
+router.route("/uploadfile").post(()=>{upload.single('file')}, catchErrors(()=>{console.log("dasdas");fileController.fileApi.uploadFile}));
 
 //_____________________________________ API to check csv document processing status ___________________________
 router.route("/documentstatus/:id").get(catchErrors(fileController.fileApi.checkStatus));

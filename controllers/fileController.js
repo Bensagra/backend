@@ -54,7 +54,9 @@ const fileApi = {
 
 
         let documentId = null
+        console.log("Juannn")
         const result = await saveToDB(fileContent, res)
+        console.log(result)
         if (result) {
             documentId = result?._id
             res.status(200).json({
