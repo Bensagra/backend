@@ -11,7 +11,7 @@ const Papa = require('papaparse');
 const webCrawler = new Crawler()
 
 const fileApi = {
-    uploadFile: async (req, res) => {
+   uploadFile: async (req, res) => {
         // Check if a file is included in the request
         if (!req.file) {
             return res.status(400).json({ success: false, message: 'No file uploaded.' });
