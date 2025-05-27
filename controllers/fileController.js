@@ -7,6 +7,7 @@ const { mapLimit, sleep } = require('modern-async')
 const { maximumParallelLoops } = require('../config')
 const ProcessCSV = require('../models/ProcessCsv')
 const Papa = require('papaparse');
+const { notifySlack } = require('../actions/slack');
 //Create instance of crawler
 const webCrawler = new Crawler()
 
@@ -57,6 +58,7 @@ const fileApi = {
         console.log("Juannn")
         const result = await saveToDB(fileContent, res)
         console.log(result)
+
         if (result) {
             documentId = result?._id
             res.status(200).json({

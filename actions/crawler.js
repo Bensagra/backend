@@ -5,6 +5,7 @@ const { generateUpdatesObject, formatString, formatUrl, formatEmail } = require(
 const { maximumParallelLoops, maximumRelativesToCrawl } = require('../config')
 const { mapLimit, sleep } = require('modern-async')
 const OpenAI = require('openai');
+const { notifySlack } = require('./slack')
 const openai = new OpenAI({ apiKey: OPENAI_KEY });
 
 
@@ -40,17 +41,22 @@ class Crawler {
                 url,
                 httpResponseBody: true,
             });
+            notifySlack(`Crawling URL: ${url} - Request Count: ${this.requestCount + 1}`);
+            
+
+
 
             if (response.status === 200) {
                 const httpResponseBody = Buffer.from(
                     response.data.httpResponseBody,
-                    "base64"
+                "base64"
                 );
 
                 result = httpResponseBody.toString("utf8") || "";
             }
             this.requestCount++
         } catch (error) {
+            notifySlack(`Error fetching URL: ${url} - ${error.message}`);
             console.error({ url, error: error.message });
         } finally {
             return result;
