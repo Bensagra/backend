@@ -41,6 +41,7 @@ class Crawler {
                 url,
                 httpResponseBody: true,
             });
+            delay(1000); // Delay to avoid hitting rate limits
             notifySlack(`Crawling URL: ${url} - Request Count: ${this.requestCount + 1}`);
             
 
@@ -57,6 +58,7 @@ class Crawler {
             this.requestCount++
         } catch (error) {
             notifySlack(`Error fetching URL: ${url} - ${error.message}`);
+            delay(1000); // Delay to avoid hitting rate limits
             console.error({ url, error: error.message });
         } finally {
             return result;
