@@ -1,7 +1,7 @@
 // slackNotifier.js
 const axios = require('axios');
 
-const slackWebhookUrl = "https://hooks.slack.com/services/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";
+const slackWebhookUrl = "https://hooks.slack.com/services/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";
 
 /**
  * Envía un mensaje predefinido a un webhook de Slack
