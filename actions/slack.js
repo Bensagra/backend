@@ -1,7 +1,11 @@
 // slackNotifier.js
 const axios = require('axios');
-
-const slackWebhookUrl = "https://hooks.slack.com/services/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";
+const dotenv = require('dotenv');
+dotenv.config();
+const slackWebhookUrl = process.env.SLACK_WEBHOOK_URL;
+if (!slackWebhookUrl) {
+  throw new Error("SLACK_WEBHOOK_URL is not defined in the environment variables.");
+}
 
 /**
  * Envía un mensaje predefinido a un webhook de Slack
