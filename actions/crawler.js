@@ -1,6 +1,6 @@
 const axios = require('axios')
 const cheerio = require('cheerio')
-const { AUTH, OPENAI_KEY } = process.env
+const { AUTH, OPENAI_KEY, APIKEY } = process.env
 const { generateUpdatesObject, formatString, formatUrl, formatEmail } = require('../utils')
 const { maximumParallelLoops, maximumRelativesToCrawl } = require('../config')
 const { mapLimit, sleep } = require('modern-async')
@@ -12,10 +12,7 @@ const openai = new OpenAI({ apiKey: OPENAI_KEY });
 class Crawler {
     constructor() {
         this.axiosInstance = axios.create({
-            baseURL: "https://api.zyte.com/v1/extract",
-            auth: {
-                username: AUTH
-            }
+            baseURL: `https://app.scrapingbee.com/api/v1`,
         })
         this.axiosBizFileInstance = axios.create({
             baseURL: 'https://bizfileonline.sos.ca.gov',
@@ -34,39 +31,55 @@ class Crawler {
      * @param {string} url 
      * @returns {httpResponseBody} 
      */
-    async getHtmlContent(url) {
-        let result = "";
-        try {
-            // const response = await this.axiosInstance.post("", {
-            //     url,
-            //     httpResponseBody: true,
-            // });
-            const response = await axios.post(url, {
-                httpResponseBody: true,
-            },)
-            delay(1000); // Delay to avoid hitting rate limits
-            notifySlack(`Crawling URL: ${url} - Request Count: ${this.requestCount + 1}`);
-            
 
+async addressesMatchUsingAI(a, b) {
+    const prompt = `Do "${a}" and "${b}" refer to the same person or address? Reply only with true or false.`;
 
-
-            if (response.status === 200) {
-                const httpResponseBody = Buffer.from(
-                    response.data.httpResponseBody,
-                "base64"
-                );
-
-                result = httpResponseBody.toString("utf8") || "";
-            }
-            this.requestCount++
-        } catch (error) {
-            notifySlack(`Error fetching URL: ${url} - ${error.message}`);
-            delay(1000); // Delay to avoid hitting rate limits
-            console.error({ url, error: error.message });
-        } finally {
-            return result;
-        }
+    try {
+        const res = await openai.chat.completions.create({
+            model: 'gpt-3.5-turbo',
+            messages: [
+                { role: 'system', content: 'You are an assistant that compares two names or addresses. Only respond with "true" or "false".' },
+                { role: 'user', content: prompt }
+            ],
+            temperature: 0
+        });
+        return res.choices[0]?.message?.content?.trim().toLowerCase() === 'true';
+    } catch (err) {
+        console.error("🧠 Error comparing via OpenAI:", err.message);
+        return false;
     }
+}
+    
+async getHtmlContent(url) {
+  let result = "";
+  try {
+    const response = await this.axiosInstance.get("", {
+      params: {
+        api_key: APIKEY,
+        url: url,
+        render_js: true,
+      },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+      }
+    });
+
+    this.requestCount++;
+    result = response.data; // ✅ HTML directamente
+    notifySlack(`✅ Scraping exitoso: ${url}`);
+  } catch (error) {
+    notifySlack(`❌ Error al obtener HTML: ${url} - ${error.message}`);
+    console.error("❌ Error:", {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data?.slice?.(0, 200)
+    });
+    await sleep(1000);
+  } finally {
+    return result;
+  }
+}
 
     /**
      * Searches through the site and Gives back phone number of matching user, relatives, Relatives phone, associates
@@ -163,6 +176,8 @@ class Crawler {
         }
     }
 
+
+    
     /**
      * Takes Both addresses and returns profile URL of matched address.
      * @param {string} mailingAddress 
@@ -171,50 +186,78 @@ class Crawler {
      * @returns {object}
      */
     async getDetailsProfileURLByAddress(mailingAddress, propertyAddress, htmlContent) {
-        let profileURL = ''
-        let isMatchfound = false
-        const cardPhoneNumbers = []
+    let profileURL = '';
+    let isMatchfound = false;
+    const cardPhoneNumbers = [];
 
-        try {
-            const lowercaseTargetMailingaddress = mailingAddress.toLowerCase();
-            const lowercaseTargetPropertyaddress = propertyAddress.toLowerCase()
+    try {
+        const data = this.extractDataFromLdJson(htmlContent);
 
-            const $ = cheerio.load(htmlContent)
+        if (data) {
+            const { telephones, addresses, profileURL: extractedUrl } = data;
 
-            // Select all elements with class 'card'
-            const cardList = $('.card');
+            // Normalizá las direcciones a minúsculas
+            const targetAddresses = [mailingAddress, propertyAddress].map(a =>
+                a?.toLowerCase().trim()
+            );
 
-            // Iterate over each card
-            cardList.each((index, card) => {
-                // Select the '.address' element within the card
-                const address = $(card).find('.address');
-                const phoneNumbers = $(card).find('.phone')
+         const matchFound = addresses?.some(addr => {
+    const addressFull = addr.full?.toLowerCase() || '';
+    return targetAddresses.some(target =>
+        addressFull.includes(target.toLowerCase()) ||
+        addressFull.replace(/[^a-z0-9]/gi, '').includes(target.replace(/[^a-z0-9]/gi, ''))
+    );
+});
 
-                phoneNumbers.each((index, element) => {
-                    const phoneNumber = $(element).text().trim();
-                    if(phoneNumber) cardPhoneNumbers.push(phoneNumber);
-                });
-
-
-                // Check if the '.address' element exists
-                if (address.length > 0) {
-
-                    const cardAddress = address.text().trim().toLowerCase();
-
-                    // Check if card address matches the target mailing address
-                    if (cardAddress.includes(lowercaseTargetMailingaddress) || cardAddress.includes(lowercaseTargetPropertyaddress)) {
-                        isMatchfound = true
-
-                        profileURL = $(card).find('[title*="View full"]').attr('href');
-                    }
-                }
-            });
-        } catch (error) {
-            console.error(`Error extracting profile URL by address`, error)
-        } finally {
-            return { profileURL, isMatchfound, cardPhoneNumbers }
+            if (matchFound) {
+                isMatchfound = true;
+                profileURL = extractedUrl || '';
+                cardPhoneNumbers.push(...(telephones || []));
+            }
         }
+    } catch (error) {
+        console.error(`Error extracting profile URL by address`, error);
     }
+
+    return { profileURL, isMatchfound, cardPhoneNumbers };
+}
+
+extractDataFromLdJson(html) {
+    const $ = cheerio.load(html);
+    let result = null;
+
+    $('script[type="application/ld+json"]').each((_, el) => {
+        try {
+            const raw = $(el).html()?.trim();
+            if (!raw) return;
+
+            const json = JSON.parse(raw);
+
+            const jsonObjects = Array.isArray(json) ? json : [json];
+
+            const person = jsonObjects.find(entry => entry['@type'] === 'Person');
+
+            if (person) {
+                result = {
+                    name: person.name,
+                    telephones: person.telephone || [],
+                    addresses: (person.address || []).map(addr => ({
+                        street: addr.streetAddress,
+                        city: addr.addressLocality,
+                        state: addr.addressRegion,
+                        postalCode: addr.postalCode,
+                        full: `${addr.streetAddress}, ${addr.addressLocality}, ${addr.addressRegion} ${addr.postalCode}`
+                    })),
+                    profileURL: person.url || person['@id'] || null
+                };
+            }
+        } catch (err) {
+            console.warn("⚠️ Error parsing JSON from <script type='ld+json'>:", err.message);
+        }
+    });
+
+    return result;
+}
 
     /**
      * Main function responsible to extract all details from the profile and give us back proper data
@@ -263,79 +306,61 @@ class Crawler {
      * @param {httpResponseBody} htmlContent 
      * @returns {object}
      */
-    async getDetailsProfileURL(ownerDetails, htmlContent, address) {
-        try {
-            let profileURL = '';
-            let isMatchfound = false;
-            let cardPhoneNumbers = []
-            const $ = cheerio.load(htmlContent);
+async getDetailsProfileURL(ownerDetails, htmlContent, address) {
+    try {
+        const data = this.extractDataFromLdJson(htmlContent);
 
-            const cardList = $('.card');
+        console.log("⏬ LD+JSON parsed data:");
+        console.dir(data, { depth: null });
 
-            function pushPhone(phoneNumbers){
-                phoneNumbers.each((index, element) => {
-                    const phoneNumber = $(element).text().trim();
-                    if (phoneNumber) cardPhoneNumbers.push(phoneNumber);
-                });
-            }
+        if (data) {
+            const { name, telephones, addresses, profileURL } = data;
 
-            for (let index = 0; index < cardList.length; index++) {
-                const card = cardList.eq(index);
-                const nameGiven = card.find('.name-given');
+            const fullNamesToMatch = [
+                `${ownerDetails.ownerOneFirstName} ${ownerDetails.ownerOneLastName}`,
+                `${ownerDetails.ownerTwoFirstName} ${ownerDetails.ownerTwoLastName}`
+            ].filter(n => n.trim().length > 0);
 
-                const phoneNumbers = $(card).find('.phone')
+           let matchesName = fullNamesToMatch.some(fullName =>
+    name?.toLowerCase().includes(fullName.toLowerCase())
+);
 
-                if (nameGiven.length > 0) {
-                    const cardFullName = nameGiven.text().trim();
-                    const ownerOneFullNAme = `${ownerDetails.ownerOneFirstName} ${ownerDetails.ownerOneLastName}`;
-                    const ownerTwoFullNAme = `${ownerDetails.ownerTwoFirstName} ${ownerDetails.ownerTwoLastName}`;
-                    const cardAddress = card.find('.address-current').text().trim();
-
-                    if (
-                        (ownerOneFullNAme.length && cardFullName === ownerOneFullNAme) ||
-                        (ownerTwoFullNAme.length && cardFullName === ownerTwoFullNAme)
-                    ) {
-                        isMatchfound = true;
-                        profileURL = card.find('[title*="View full"]').attr('href');
-                        pushPhone(phoneNumbers)
-                        return { profileURL: profileURL, isMatchfound: isMatchfound, cardPhoneNumbers };
-                    }
-                    else if (
-                        (ownerDetails.ownerOneFirstName?.length && ownerDetails.ownerOneLastName?.length &&
-                            cardFullName.includes(ownerDetails.ownerOneFirstName) && cardFullName.includes(ownerDetails.ownerOneLastName)) ||
-                        (ownerDetails?.ownerTwoFirstName?.length && ownerDetails?.ownerTwoLastName?.length &&
-                            cardFullName.includes(ownerDetails.ownerTwoFirstName) && cardFullName.includes(ownerDetails.ownerTwoLastName))
-                    ) {
-                        isMatchfound = true;
-                        profileURL = card.find('[title*="View full"]').attr('href');
-                        pushPhone(phoneNumbers)
-                        return { profileURL: profileURL, isMatchfound: isMatchfound, cardPhoneNumbers };
-                    }
-                    else if (
-                        (
-                            !ownerDetails.ownerOneFirstName?.length && ownerDetails.ownerOneLastName?.length &&
-                            cardFullName.includes(ownerDetails.ownerOneLastName) && cardAddress.includes(address)
-                        )
-                        ||
-                        (
-                            !ownerDetails.ownerTwoFirstName?.length && ownerDetails.ownerTwoLastName?.length &&
-                            cardFullName.includes(ownerDetails.ownerTwoLastName) && cardAddress.includes(address)
-                        )
-                    ) {
-                        isMatchfound = true;
-                        profileURL = card.find('[title*="View full"]').attr('href');
-                        pushPhone(phoneNumbers)
-                        return { profileURL: profileURL, isMatchfound: isMatchfound, cardPhoneNumbers };
-                    }
-                }
-            }
-        } catch (error) {
-            console.error(`Error extracting profile URL`, error);
-        }
-
-        // Return a default value if no match is found
-        return { profileURL: '', isMatchfound: false, cardPhoneNumbers: [] };
+// 🔁 Si no matchea por comparación directa, preguntale a OpenAI
+if (!matchesName && name) {
+    for (const fullName of fullNamesToMatch) {
+        matchesName = await this.addressesMatchUsingAI(fullName, name);
+        if (matchesName) break;
     }
+}
+
+           const matchesAddress = addresses?.some(addr => {
+    const normalizedSiteAddr = normalizeAddress(addr.full || '');
+    const normalizedInputAddr = normalizeAddress(address);
+    return normalizedSiteAddr.includes(normalizedInputAddr) || normalizedInputAddr.includes(normalizedSiteAddr);
+});
+
+            console.log("🔍 Checking names:", fullNamesToMatch, "vs", name);
+            console.log("🏠 Checking address:", address, "vs", addresses?.map(a => a.full));
+
+            if (matchesName || matchesAddress) {
+                console.log("✅ Match found!");
+                return {
+                    profileURL: profileURL,
+                    isMatchfound: true,
+                    cardPhoneNumbers: telephones || [],
+                };
+            } else {
+                console.log("❌ No match found");
+            }
+        } else {
+            console.log("⚠️ No LD+JSON data found");
+        }
+    } catch (error) {
+        console.error(`❌ Error extracting profile URL`, error);
+    }
+
+    return { profileURL: '', isMatchfound: false, cardPhoneNumbers: [] };
+}
 
 
     /**
@@ -567,6 +592,16 @@ class Crawler {
             return null;
         }
     }
-}
+     normalizeAddress(address) {
+  return address
+    .toLowerCase()
+    .replace(/[^a-z0-9]/gi, '') // elimina espacios, comas, etc.
+    .replace(/\bapt\b/g, '')    // quita 'apt'
+    .replace(/\bs\b/g, '')      // quita 's'
+    .replace(/\bave\b/g, '')    // quita 'ave'
+    .replace(/\besplanade\b/g, '') // opcional, si querés ser más laxo
+    .trim();
+}}
+
 
 module.exports = Crawler
