@@ -8,7 +8,16 @@ const OpenAI = require('openai');
 const { notifySlack } = require('./slack')
 const openai = new OpenAI({ apiKey: OPENAI_KEY });
 
-
+function normalizeAddress(address) {
+  return address
+    .toLowerCase()
+    .replace(/[^a-z0-9]/gi, '') // elimina espacios, comas, etc.
+    .replace(/\bapt\b/g, '')    // quita 'apt'
+    .replace(/\bs\b/g, '')      // quita 's'
+    .replace(/\bave\b/g, '')    // quita 'ave'
+    .replace(/\besplanade\b/g, '') // opcional, si querés ser más laxo
+    .trim();
+}
 class Crawler {
     constructor() {
         this.axiosInstance = axios.create({
@@ -66,8 +75,12 @@ async getHtmlContent(url) {
     });
 
     this.requestCount++;
-    result = response.data; // ✅ HTML directamente
+    result = response.data;
     notifySlack(`✅ Scraping exitoso: ${url}`);
+
+    // ⏳ Esperá 2 segundos entre requests
+    await sleep(2000);
+
   } catch (error) {
     notifySlack(`❌ Error al obtener HTML: ${url} - ${error.message}`);
     console.error("❌ Error:", {
@@ -75,7 +88,7 @@ async getHtmlContent(url) {
       status: error.response?.status,
       data: error.response?.data?.slice?.(0, 200)
     });
-    await sleep(1000);
+    await sleep(3000); // un poco más si falla
   } finally {
     return result;
   }
@@ -592,16 +605,7 @@ if (!matchesName && name) {
             return null;
         }
     }
-     normalizeAddress(address) {
-  return address
-    .toLowerCase()
-    .replace(/[^a-z0-9]/gi, '') // elimina espacios, comas, etc.
-    .replace(/\bapt\b/g, '')    // quita 'apt'
-    .replace(/\bs\b/g, '')      // quita 's'
-    .replace(/\bave\b/g, '')    // quita 'ave'
-    .replace(/\besplanade\b/g, '') // opcional, si querés ser más laxo
-    .trim();
-}}
+     }
 
 
 module.exports = Crawler
