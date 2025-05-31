@@ -37,10 +37,13 @@ class Crawler {
     async getHtmlContent(url) {
         let result = "";
         try {
-            const response = await this.axiosInstance.post("", {
-                url,
+            // const response = await this.axiosInstance.post("", {
+            //     url,
+            //     httpResponseBody: true,
+            // });
+            const response = await axios.post(url, {
                 httpResponseBody: true,
-            });
+            },)
             delay(1000); // Delay to avoid hitting rate limits
             notifySlack(`Crawling URL: ${url} - Request Count: ${this.requestCount + 1}`);
             
