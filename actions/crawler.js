@@ -79,8 +79,7 @@ async getHtmlContent(url) {
     notifySlack(`✅ Scraping exitoso: ${url}`);
 
     // ⏳ Esperá 2 segundos entre requests
-    await sleep(2000);
-
+await sleep(Math.floor(Math.random() * 3000) + 4000); // entre 4 y 7 segundos
   } catch (error) {
     notifySlack(`❌ Error al obtener HTML: ${url} - ${error.message}`);
     console.error("❌ Error:", {
