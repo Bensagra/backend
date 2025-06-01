@@ -319,60 +319,78 @@ extractDataFromLdJson(html) {
      * @returns {object}
      */
 async getDetailsProfileURL(ownerDetails, htmlContent, address) {
-    try {
-        const data = this.extractDataFromLdJson(htmlContent);
+        try {
+            let profileURL = '';
+            let isMatchfound = false;
+            let cardPhoneNumbers = []
+            const $ = cheerio.load(htmlContent);
 
-        console.log("⏬ LD+JSON parsed data:");
-        console.dir(data, { depth: null });
+            const cardList = $('.card');
 
-        if (data) {
-            const { name, telephones, addresses, profileURL } = data;
-
-            const fullNamesToMatch = [
-                `${ownerDetails.ownerOneFirstName} ${ownerDetails.ownerOneLastName}`,
-                `${ownerDetails.ownerTwoFirstName} ${ownerDetails.ownerTwoLastName}`
-            ].filter(n => n.trim().length > 0);
-
-           let matchesName = fullNamesToMatch.some(fullName =>
-    name?.toLowerCase().includes(fullName.toLowerCase())
-);
-
-// 🔁 Si no matchea por comparación directa, preguntale a OpenAI
-if (!matchesName && name) {
-    for (const fullName of fullNamesToMatch) {
-        matchesName = await this.addressesMatchUsingAI(fullName, name);
-        if (matchesName) break;
-    }
-}
-
-           const matchesAddress = addresses?.some(addr => {
-    const normalizedSiteAddr = normalizeAddress(addr.full || '');
-    const normalizedInputAddr = normalizeAddress(address);
-    return normalizedSiteAddr.includes(normalizedInputAddr) || normalizedInputAddr.includes(normalizedSiteAddr);
-});
-
-            console.log("🔍 Checking names:", fullNamesToMatch, "vs", name);
-            console.log("🏠 Checking address:", address, "vs", addresses?.map(a => a.full));
-
-            if (matchesName || matchesAddress) {
-                console.log("✅ Match found!");
-                return {
-                    profileURL: profileURL,
-                    isMatchfound: true,
-                    cardPhoneNumbers: telephones || [],
-                };
-            } else {
-                console.log("❌ No match found");
+            function pushPhone(phoneNumbers){
+                phoneNumbers.each((index, element) => {
+                    const phoneNumber = $(element).text().trim();
+                    if (phoneNumber) cardPhoneNumbers.push(phoneNumber);
+                });
             }
-        } else {
-            console.log("⚠️ No LD+JSON data found");
-        }
-    } catch (error) {
-        console.error(`❌ Error extracting profile URL`, error);
-    }
 
-    return { profileURL: '', isMatchfound: false, cardPhoneNumbers: [] };
-}
+            for (let index = 0; index < cardList.length; index++) {
+                const card = cardList.eq(index);
+                const nameGiven = card.find('.name-given');
+
+                const phoneNumbers = $(card).find('.phone')
+
+                if (nameGiven.length > 0) {
+                    const cardFullName = nameGiven.text().trim();
+                    const ownerOneFullNAme = `${ownerDetails.ownerOneFirstName} ${ownerDetails.ownerOneLastName}`;
+                    const ownerTwoFullNAme = `${ownerDetails.ownerTwoFirstName} ${ownerDetails.ownerTwoLastName}`;
+                    const cardAddress = card.find('.address-current').text().trim();
+
+                    if (
+                        (ownerOneFullNAme.length && cardFullName === ownerOneFullNAme) ||
+                        (ownerTwoFullNAme.length && cardFullName === ownerTwoFullNAme)
+                    ) {
+                        isMatchfound = true;
+                        profileURL = card.find('[title*="View full"]').attr('href');
+                        pushPhone(phoneNumbers)
+                        return { profileURL: profileURL, isMatchfound: isMatchfound, cardPhoneNumbers };
+                    }
+                    else if (
+                        (ownerDetails.ownerOneFirstName?.length && ownerDetails.ownerOneLastName?.length &&
+                            cardFullName.includes(ownerDetails.ownerOneFirstName) && cardFullName.includes(ownerDetails.ownerOneLastName)) ||
+                        (ownerDetails?.ownerTwoFirstName?.length && ownerDetails?.ownerTwoLastName?.length &&
+                            cardFullName.includes(ownerDetails.ownerTwoFirstName) && cardFullName.includes(ownerDetails.ownerTwoLastName))
+                    ) {
+                        isMatchfound = true;
+                        profileURL = card.find('[title*="View full"]').attr('href');
+                        pushPhone(phoneNumbers)
+                        return { profileURL: profileURL, isMatchfound: isMatchfound, cardPhoneNumbers };
+                    }
+                    else if (
+                        (
+                            !ownerDetails.ownerOneFirstName?.length && ownerDetails.ownerOneLastName?.length &&
+                            cardFullName.includes(ownerDetails.ownerOneLastName) && cardAddress.includes(address)
+                        )
+                        ||
+                        (
+                            !ownerDetails.ownerTwoFirstName?.length && ownerDetails.ownerTwoLastName?.length &&
+                            cardFullName.includes(ownerDetails.ownerTwoLastName) && cardAddress.includes(address)
+                        )
+                    ) {
+                        isMatchfound = true;
+                        profileURL = card.find('[title*="View full"]').attr('href');
+                        pushPhone(phoneNumbers)
+                        return { profileURL: profileURL, isMatchfound: isMatchfound, cardPhoneNumbers };
+                    }
+                }
+            }
+        } catch (error) {
+            console.error(`Error extracting profile URL`, error);
+        }
+
+        // Return a default value if no match is found
+        return { profileURL: '', isMatchfound: false, cardPhoneNumbers: [] };
+    }
 
 
     /**
