@@ -7,7 +7,20 @@ const { mapLimit, sleep } = require('modern-async')
 const OpenAI = require('openai');
 const { notifySlack } = require('./slack')
 const openai = new OpenAI({ apiKey: OPENAI_KEY });
+function cleanPhoneDuplicates(labeledPhones) {
+  const seen = new Set();
+  const finalList = [];
 
+  for (const phone of labeledPhones) {
+    const normalized = phone.replace(/^[WLU]\s/, '').trim(); // quita prefijo
+    if (seen.has(normalized)) continue;
+
+    seen.add(normalized);
+    finalList.push(phone);
+  }
+
+  return finalList;
+}
 function normalizeAddress(address) {
   return address
     .toLowerCase()
@@ -41,6 +54,105 @@ class Crawler {
      * @returns {httpResponseBody} 
      */
 
+    async checkPhoneType(phoneNumber) {
+  const prompt = `Is the phone number "${phoneNumber}" a wireless/mobile or landline number in the United States? Reply only with "W" for wireless or "L" for landline.`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [
+        { role: 'system', content: 'You are an assistant that knows whether a US phone number is wireless (mobile) or landline. Only answer "W" or "L".' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0
+    });
+
+    const type = response.choices[0]?.message?.content?.trim().toUpperCase();
+    if (type === 'W' || type === 'L') return type;
+    return 'U'; // Unknown
+  } catch (error) {
+    console.error(`Error determining phone type for ${phoneNumber}:`, error.message);
+    return 'U';
+  }
+}
+async labelPhoneNumbers(phoneNumbers) {
+  const seen = new Set();
+  const cleanedPhones = phoneNumbers
+    .map(p => p.trim())
+    .filter(p => /^\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}$/.test(p)); // básico: (123) 456-7890 o 123-456-7890
+
+  const uniquePhones = [...new Set(cleanedPhones)];
+
+  if (uniquePhones.length === 0) return [];
+
+  const prompt = `
+Label the following US phone numbers as Wireless (W), Landline (L), or Unknown (U).
+Return ONLY one per line, in this format: "W (123) 456-7890", "L (123) 456-7890", or "U (123) 456-7890".
+
+Numbers:
+${uniquePhones.join('\n')}
+`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [
+        { role: 'system', content: 'You are an assistant that classifies US phone numbers as Wireless (W), Landline (L), or Unknown (U).' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0
+    });
+
+    const rawOutput = response.choices[0]?.message?.content || '';
+
+    const lines = rawOutput
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => /^[WLU] \(\d{3}\) \d{3}-\d{4}$/.test(l));
+
+    const map = new Map(lines.map(l => [l.slice(2), l])); // clave sin prefijo
+
+    // fallback U para los que no fueron etiquetados por el modelo
+    const finalList = uniquePhones.map(phone => {
+      const normalized = this.normalizePhone(phone);
+      return map.get(normalized) || `U ${normalized}`;
+    });
+
+    // quitar duplicados con prioridad W > L > U
+    return this.cleanPhoneDuplicatesSmart(finalList);
+  } catch (error) {
+    console.error("🔥 GPT labeling error:", error.message);
+    return uniquePhones.map(p => `U ${this.normalizePhone(p)}`);
+  }
+}
+cleanPhoneDuplicatesSmart(labeledPhones) {
+  const byNumber = {};
+
+  for (const phone of labeledPhones) {
+    const match = phone.match(/^([WLU]) (\(\d{3}\) \d{3}-\d{4})$/);
+    if (!match) continue;
+
+    const [ , type, number ] = match;
+    const current = byNumber[number];
+
+    if (!current || this.isBetterType(type, current.type)) {
+      byNumber[number] = { phone: `${type} ${number}`, type };
+    }
+  }
+
+  return Object.values(byNumber).map(entry => entry.phone);
+}
+
+isBetterType(newType, currentType) {
+  const priority = { 'W': 3, 'L': 2, 'U': 1 };
+  return priority[newType] > priority[currentType];
+}
+normalizePhone(phone) {
+  const match = phone.match(/\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
+  if (!match) return phone;
+  const digits = phone.replace(/\D/g, '');
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+}
 async addressesMatchUsingAI(a, b) {
     const prompt = `Do "${a}" and "${b}" refer to the same person or address? Reply only with true or false.`;
 
@@ -188,7 +300,46 @@ await sleep(Math.floor(Math.random() * 3000) + 4000); // entre 4 y 7 segundos
         }
     }
 
+isValidPhone(phone) {
+  return /^\(\d{3}\)\s?\d{3}-\d{4}$/.test(phone);
+}
 
+async checkPhoneType(phoneNumber) {
+  const prompt = `Is the phone number "${phoneNumber}" a wireless/mobile or landline number in the United States? Reply only with "W" for wireless or "L" for landline.`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [
+        { role: 'system', content: 'You are an assistant that knows whether a US phone number is wireless (mobile) or landline. Only answer "W" or "L".' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0
+    });
+
+    const type = response.choices[0]?.message?.content?.trim().toUpperCase();
+    return ['W', 'L'].includes(type) ? type : 'U';
+  } catch (error) {
+    console.error(`Error determining phone type for ${phoneNumber}:`, error.message);
+    return 'U';
+  }
+}
+
+async labelPhoneNumbers(phoneNumbers) {
+  const labeled = [];
+  const seen = new Set();
+
+  for (const raw of phoneNumbers) {
+    const phone = raw.trim();
+    if (seen.has(phone)) continue;
+    seen.add(phone);
+
+    const type = this.isValidPhone(phone) ? await this.checkPhoneType(phone) : 'U';
+    labeled.push(`${type} ${phone}`);
+  }
+
+  return labeled;
+}
     
     /**
      * Takes Both addresses and returns profile URL of matched address.
@@ -282,35 +433,64 @@ extractDataFromLdJson(html) {
      * @param {Array} allEmails 
      * @returns {Object}
      */
-    async processUserMatched(profileURL, allPhoneNumbers, allRelatives, allAssociates, allRelativeNames, allAssociateNames, allEmails) {
-        try {
-            // Fetch details with the url
-            const { phoneNumbers, relatives, associates, relativeNames, associateNames, emailAddresses } = await this.extractDetailsByUrl(profileURL);
-            if (phoneNumbers.length) phoneNumbers.forEach(phoneNumber => {
-                if (!allPhoneNumbers.includes(phoneNumber)) allPhoneNumbers.push(phoneNumber);
-            });
-            if (relatives.length) relatives.forEach(relative => {
-                if (!allRelatives.includes(relative)) allRelatives.push(relative);
-            });
-            if (associates.length) associates.forEach(associate => {
-                if (!allAssociates.includes(associate)) allAssociates.push(associate);
-            });
-            if (relativeNames.length) relativeNames.forEach(relative => {
-                if (!allRelativeNames.includes(relative)) allRelativeNames.push(relative);
-            });
-            if (associateNames.length) associateNames.forEach(associate => {
-                if (!allAssociateNames.includes(associate)) allAssociateNames.push(associate);
-            });
-            if (emailAddresses.length) emailAddresses.forEach(email => {
-                if (!allEmails.includes(email)) allEmails.push(email);
-            });
 
-            return { allPhoneNumbers, allRelatives, allAssociates, allRelativeNames, allAssociateNames, allEmails };
-        } catch (error) {
-            console.error(`Error processing user details: `, error);
-            return { allPhoneNumbers, allRelatives, allAssociates, allRelativeNames, allAssociateNames, allEmails };
-        }
-    }
+async labelAllPhoneNumbersBatch(results) {
+  for (const row of results) {
+    if (!Array.isArray(row.phoneNumbers)) continue;
+
+    const labeled = await this.labelPhoneNumbers(row.phoneNumbers);
+    row.phoneNumbers = this.cleanPhoneDuplicatesSmart(labeled); // o solo labeled si no tenés esa función
+  }
+  return results;
+}
+    
+ async processUserMatched(profileURL, allPhoneNumbers, allRelatives, allAssociates, allRelativeNames, allAssociateNames, allEmails) {
+  try {
+    const { phoneNumbers, relatives, associates, relativeNames, associateNames, emailAddresses } = await this.extractDetailsByUrl(profileURL);
+
+    // ✅ Normalizar, eliminar duplicados y etiquetar
+let labeledPhones = await this.labelPhoneNumbers(phoneNumbers);
+labeledPhones = cleanPhoneDuplicates(labeledPhones);
+
+// 🧽 Filtro extra de duplicados, ignorando letras
+
+labeledPhones.forEach(phone => {
+  if (!allPhoneNumbers.includes(phone)) allPhoneNumbers.push(phone);
+});
+labeledPhones.forEach(phone => {
+  if (!allPhoneNumbers.includes(phone)) allPhoneNumbers.push(phone);
+});
+    // ✅ Guardar solo los únicos etiquetados
+    labeledPhones.forEach(phone => {
+      if (!allPhoneNumbers.includes(phone)) allPhoneNumbers.push(phone);
+    });
+
+    relatives.forEach(relative => {
+      if (!allRelatives.includes(relative)) allRelatives.push(relative);
+    });
+
+    associates.forEach(associate => {
+      if (!allAssociates.includes(associate)) allAssociates.push(associate);
+    });
+
+    relativeNames.forEach(relative => {
+      if (!allRelativeNames.includes(relative)) allRelativeNames.push(relative);
+    });
+
+    associateNames.forEach(associate => {
+      if (!allAssociateNames.includes(associate)) allAssociateNames.push(associate);
+    });
+
+    emailAddresses.forEach(email => {
+      if (!allEmails.includes(email)) allEmails.push(email);
+    });
+
+    return { allPhoneNumbers, allRelatives, allAssociates, allRelativeNames, allAssociateNames, allEmails };
+  } catch (error) {
+    console.error(`Error processing user details: `, error);
+    return { allPhoneNumbers, allRelatives, allAssociates, allRelativeNames, allAssociateNames, allEmails };
+  }
+}
 
     /**
      * Takes owner name and returns back matching profile URL

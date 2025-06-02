@@ -145,53 +145,74 @@ const isProcessingCancelled = async (documentId) => {
  * @returns {Array}
  */
 const crawlAndSave = async (rows, fileContent, documentId) => {
-    try {
-        let updatedContent = fileContent
-        const totalRows = rows.length
-        if (totalRows > 0) {
+  try {
+    let updatedContent = fileContent;
+    const totalRows = rows.length;
 
-            let sharedData = {}
-            let rowsProcessed = 0
-            const startTime = Date.now();
-            await mapLimit(rows, async (row, index) => {
-                // check if this process is cancelled
-                if (await isProcessingCancelled(documentId)) {
-                    console.log('Document processing cancelled');
-                    return
-                } else if (index !== 0) {
-                    const updateContext = await crawlData(row, documentId)
-                    sharedData[index] = updateContext
-                    rowsProcessed++
-                    const rowUpdateInfo = {
-                        totalRows: totalRows - 1,
-                        rowsProcessed: rowsProcessed,
-                        processingTime: Date.now() - startTime,
-                        requestCount: await webCrawler.getRequestCount()
-                    }
-                    updateDB(documentId, null, rowUpdateInfo)
-                }
+    if (totalRows > 0) {
+      let sharedData = {};
+      let rowsProcessed = 0;
+      const startTime = Date.now();
 
-            }, maximumParallelLoops)
-            if (await isProcessingCancelled(documentId)) {
-                console.log('Document processing cancelled');
-                return
-            }
-
-            // Lets save the context
-            for (const key in sharedData) {
-                if (sharedData.hasOwnProperty(key)) {
-                    const currentContext = sharedData[key];
-                    console.log(currentContext)
-                    updatedContent = await saveData(updatedContent, currentContext, key);
-                }
-            }
-
-            return updatedContent
+      await mapLimit(rows, async (row, index) => {
+        if (await isProcessingCancelled(documentId)) {
+          console.log('Document processing cancelled');
+          return;
+        } else if (index !== 0) {
+          const updateContext = await crawlData(row, documentId);
+          sharedData[index] = updateContext;
+          rowsProcessed++;
+          const rowUpdateInfo = {
+            totalRows: totalRows - 1,
+            rowsProcessed: rowsProcessed,
+            processingTime: Date.now() - startTime,
+            requestCount: await webCrawler.getRequestCount()
+          };
+          updateDB(documentId, null, rowUpdateInfo);
         }
-    } catch (error) {
-        console.error("Error during crawling and saving:", error)
+      }, maximumParallelLoops);
+
+      if (await isProcessingCancelled(documentId)) {
+        console.log('Document processing cancelled');
+        return;
+      }
+
+      // Guardar updates por fila
+      for (const key in sharedData) {
+        if (sharedData.hasOwnProperty(key)) {
+          const currentContext = sharedData[key];
+          updatedContent = await saveData(updatedContent, currentContext, key);
+        }
+      }
+
+      // 🔍 Verificación final de teléfonos
+      console.log("✅ CSV actualizado. Re-verificando teléfonos...");
+
+      const parsedFinal = Papa.parse(updatedContent, { header: false }).data;
+
+      const parsedRows = parsedFinal.map((cols, i) => ({
+        index: i,
+        phoneNumbers: [cols[getColumnIndex('ownerMobile')]].filter(Boolean) // ajustá si hay más campos
+      }));
+
+      const rechecked = await webCrawler.labelAllPhoneNumbersBatch(parsedRows);
+
+      rechecked.forEach((row, i) => {
+        (row.phoneNumbers || []).forEach(phone => {
+          if (!/^[WLU] \(\d{3}\) \d{3}-\d{4}$/.test(phone)) {
+            console.warn(`⚠️ Teléfono mal etiquetado en fila ${i}:`, phone);
+          }
+        });
+      });
+
+      console.log("🟢 Revisión final completa.");
+
+      return updatedContent;
     }
-}
+  } catch (error) {
+    console.error("Error during crawling and saving:", error);
+  }
+};
 
 /**
  * Takes a single row, Work on decision tree and get JSON data to be updated and returns it
