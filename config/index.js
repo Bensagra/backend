@@ -2,102 +2,125 @@
 
 const columnMappings = {
   // — Datos “básicos” del propietario
-  address:            0,   // “Address” está en la columna A (índice 0)
-  unitNumber:         1,   // “Unit #” está en la columna B (índice 1) — si lo necesitas
-  city:               2,   // “City” está en la columna C (índice 2)
-  state:              3,   // “State” está en la columna D (índice 3)
-  zip:                4,   // “Zip” está en la columna E (índice 4)
-  county:            5,   // “County” (si lo usas) está en la columna F (índice 5)
-  apn:               6,   // “APN” (si lo usas) está en la columna G (índice 6)
+  address:            0,   // A
+  unitNumber:         1,   // B
+  city:               2,   // C
+  state:              3,   // D
+  zip:                4,   // E
+  county:             5,   // F
+  apn:                6,   // G
 
-  ownerOccupied:     7,   // “Owner Occupied” en la columna H (índice 7) — si lo necesitas
-  ownerOneFirstName: 8,   // “Owner 1 First Name” en la columna I (índice 8)
-  ownerOneLastName:  9,   // “Owner 1 Last Name” en la columna J (índice 9)
-  ownerTwoFirstName:10,   // “Owner 2 First Name” en la columna K (índice 10)
-  ownerTwoLastName: 11,   // “Owner 2 Last Name” en la columna L (índice 11)
+  ownerOccupied:      7,   // H
+  ownerOneFirstName:  8,   // I
+  ownerOneLastName:   9,   // J
+  ownerTwoFirstName: 10,   // K
+  ownerTwoLastName:  11,   // L
 
-  // Mailing:  
-  // “Mailing Care of Name” está en M (índice 12) — si lo necesitas
-  mailingAddress:   13,   // “Mailing Address” en la columna N (índice 13)
-  mailingUnitNumber:14,   // “Mailing Unit #” en la columna O (índice 14) — si lo necesitas
-  mailingCity:      15,   // “Mailing City” en la columna P (índice 15)
-  mailingState:     16,   // “Mailing State” en la columna Q (índice 16)
-  mailingZip:       17,   // “Mailing Zip” si existe (índice 17) — ajústalo si no coincide
+  mailingCareOf:     12,   // M
+  mailingAddress:    13,   // N
+  mailingUnitNumber: 14,   // O
+  mailingCity:       15,   // P
+  mailingState:      16,   // Q
+  mailingZip:        17,   // R
+  mailingCounty:     18,   // S
+  doNotMail:         19,   // T
+  propertyType:      20,   // U
+  bedrooms:          21,   // V
+  totalBathrooms:    22,   // W
+  buildingSqft:      23,   // X
+  lotSizeSqft:       24,   // Y
+  effectiveYearBuilt:25,  // Z
+  totalAssessedValue:26,  // AA
+  lastSaleDate:      27,   // AB
+  lastSaleAmount:    28,   // AC
+  totalOpenLoans:    29,   // AD
+  estRemainingLoan:  30,   // AE
+  estValue:          31,   // AF
+  estLTV:            32,   // AG
+  estEquity:         33,   // AH
+  mlsStatus:         34,   // AI
+  mlsDate:           35,   // AJ
+  mlsAmount:         36,   // AK
+  lienAmount:        37,   // AL
+  marketingLists:    38,   // AM
+  dateAddedToList:   39,   // AN
+  unused40:          40,   // AO
 
-  // … aquí van el resto de columnas intermedias que NO usamos directamente …
+  // — Teléfonos del propietario
+  ownerMobile1:      41,   // AP
+  ownerMobile1Type:  42,   // AQ
+  ownerMobile2:      43,   // AR
+  ownerMobile2Type:  44,   // AS
+  ownerMobile3:      45,   // AT
+  ownerMobile3Type:  46,   // AU
+  ownerMobile4:      47,   // AV
+  ownerMobile4Type:  48,   // AW
+  ownerMobile5:      49,   // AX
+  ownerMobile5Type:  50,   // AY
+  ownerMobile6:      51,   // AZ
+  ownerMobile6Type:  52,   // BA
+  ownerMobile7:      53,   // BB
+  ownerMobile7Type:  54,   // BC
 
-  // ——————————————————————————————————————————————————
-  // A partir de la columna 41 “Owner MOBILE 1”, vienen estos campos:
-  ownerMobile1:     41,  // “Owner MOBILE 1” en la columna AN (índice 41)
-  ownerMobile1Type: 42,  // “Owner MOBILE 1 TYPE” en la columna AO (índice 42)
-  ownerMobile2:     43,  // “Owner MOBILE 2” en AP (índice 43)
-  ownerMobile2Type: 44,  // “Owner MOBILE 2 TYPE” en AQ (índice 44)
-  ownerMobile3:     45,  // “Owner MOBILE 3” en AR (índice 45)
-  ownerMobile3Type: 46,  // “Owner MOBILE 3 TYPE” en AS (índice 46)
-  ownerMobile4:     47,  // “Owner MOBILE 4” en AT (índice 47)
-  ownerMobile4Type: 48,  // “Owner MOBILE 4 TYPE” en AU (índice 48)
-  ownerMobile5:     49,  // “Owner MOBILE 5” en AV (índice 49)
-  ownerMobile5Type: 50,  // “Owner MOBILE 5 TYPE” en AW (índice 50)
-  ownerMobile6:     51,  // “Owner MOBILE 6” en AX (índice 51)
-  ownerMobile6Type: 52,  // “Owner MOBILE 6 TYPE” en AY (índice 52)
-  ownerMobile7:     53,  // “Owner MOBILE 7” en AZ (índice 53)
-  ownerMobile7Type: 54,  // “Owner MOBILE 7 TYPE” en BA (índice 54)
+  // — Teléfonos fijos y otros (no todos los usarás)
+  ownerLandline1:    55,   // BD
+  ownerLandline2:    56,   // BE
+  ownerLandline3:    57,   // BF
+  ownerLandline4:    58,   // BG
+  ownerLandline5:    59,   // BH
+  ownerLandline6:    60,   // BI
+  ownerVoip1:        61,   // BJ
+  ownerVoip2:        62,   // BK
+  ownerVoip3:        63,   // BL
+  ownerVoip4:        64,   // BM
+  ownerPager1:       65,   // BN
+  ownerSpecial1:     66,   // BO
+  ownerUnknown1:     67,   // BP
 
-  // Si hay columnas de Landline previas en tu CSV, ignóralas o mapea si las vas a usar:
-  // ownerLandline1:   55,  // “Owner LANDLINE 1” (índice 55)
-  // ownerLandline2:   56,  // “Owner LANDLINE 2” (índice 56)
-  // … etc.
+  // — Parientes
+  relative1Name:     68,   // BQ
+  relative1Contact1: 69,   // BR
+  relative1Contact2: 70,   // BS
+  relative1Contact3: 71,   // BT
+  relative1Contact4: 72,   // BU
+  relative1Contact5: 73,   // BV
 
-  // ——————————————————————————————————————————————————
-  // Parientes: “Relative N Full Name” y “Relative N Mobile M”
-  // En este CSV la fila cero (indices) es la cabecera; la parte de “Relative 1 Full Name” 
-  // está en el índice 60 aproximadamente, pero como tu CSV usa nombres largos, 
-  // sólo mapearemos si los usamos en el código:
+  relative2Name:     74,   // BW
+  relative2Contact1: 75,   // BX
+  relative2Contact2: 76,   // BY
+  relative2Contact3: 77,   // BZ
+  relative2Contact4: 78,   // CA
+  relative2Contact5: 79,   // CB
 
-  relative1Name:    60,  // “Relative 1 Full Name” en columna BJ (índice 60)
-  relative1Contact1:69,  // “Relative 1 Mobile 1” en columna BR (índice 69)
-  relative1Contact2:70,
-  relative1Contact3:71,
-  relative1Contact4:72,
-  relative1Contact5:73,
+  relative3Name:     80,   // CC
+  relative3Contact1: 81,   // CD
+  relative3Contact2: 82,   // CE
+  relative3Contact3: 83,   // CF
+  relative3Contact4: 84,   // CG
+  relative3Contact5: 85,   // CH
 
-  relative2Name:    74,  // “Relative 2 Full Name” en columna BT (índice 74)
-  relative2Contact1:75,
-  relative2Contact2:76,
-  relative2Contact3:77,
-  relative2Contact4:78,
-  relative2Contact5:79,
+  relative4Name:     86,   // CI
+  relative4Contact1: 87,   // CJ
+  relative4Contact2: 88,   // CK
+  relative4Contact3: 89,   // CL
+  relative4Contact4: 90,   // CM
+  relative4Contact5: 91,   // CN
 
-  relative3Name:    80,  // “Relative 3 Full Name” en BU (índice 80)
-  relative3Contact1:81,
-  relative3Contact2:82,
-  relative3Contact3:83,
-  relative3Contact4:84,
-  relative3Contact5:85,
+  relative5Name:     92,   // CO
+  relative5Contact1: 93,   // CP
+  relative5Contact2: 94,   // CQ
+  relative5Contact3: 95,   // CR
+  relative5Contact4: 96,   // CS
+  relative5Contact5: 97,   // CT
 
-  relative4Name:    86,  // “Relative 4 Full Name” en BV (índice 86)
-  relative4Contact1:87,
-  relative4Contact2:88,
-  relative4Contact3:89,
-  relative4Contact4:90,
-  relative4Contact5:91,
-
-  relative5Name:    92,  // “Relative 5 Full Name” en BW (índice 92)
-  relative5Contact1:93,
-  relative5Contact2:94,
-  relative5Contact3:95,
-  relative5Contact4:96,
-  relative5Contact5:97,
-
-  // ——————————————————————————————————————————————————
-  // Emails (tu CSV tiene “Email”, “Email 1”, “Email 2”, “Email 3”…)
-  emailAll:  98,  // "Email" en la columna BX (índice 98) — si quieres guardarlo
-  email1:    99,  // “Email 1” en columna BY (índice 99)
-  email2:   100,  // “Email 2” en columna BZ (índice 100)
-  email3:   101   // “Email 3” en columna CA (índice 101)
+  // — Emails
+  emailAll:          98,   // CU
+  email1:            99,   // CV
+  email2:           100,   // CW
+  email3:           101    // CX
 };
 
 const maximumParallelLoops = 10;
-const maximumRelativesToCrawl = 5; // tu CSV llega hasta Relative 5
+const maximumRelativesToCrawl = 5;
 
 module.exports = { columnMappings, maximumParallelLoops, maximumRelativesToCrawl };
